@@ -1,0 +1,40 @@
+{
+  "name": "iabdulqadeer/laravel-3ds-pay",
+  "description": "Stripe 3DS (SCA) one-time payments for Laravel apps.",
+  "type": "library",
+  "license": "MIT",
+  "version": "0.1.0",
+  "keywords": ["laravel", "stripe", "3ds", "sca", "payments"],
+  "support": {
+    "issues": "https://github.com/iabdulqadeer/laravel-3ds-pay/issues",
+    "source": "https://github.com/iabdulqadeer/laravel-3ds-pay"
+  },
+  "require": {
+    "php": ">=8.0",
+    "illuminate/support": "^9.0|^10.0|^11.0|^12.0",
+    "stripe/stripe-php": "^14.0"
+  },
+  "autoload": {
+    "psr-4": {
+      "Iabdulqadeer\\ThreeDSPay\\": "src/"
+    }
+  },
+  "extra": {
+    "laravel": {
+      "providers": [
+        "Iabdulqadeer\\ThreeDSPay\\Providers\\ThreeDSPayServiceProvider"
+      ]
+    }
+  },
+  "autoload-dev": {
+    "psr-4": {
+      "Iabdulqadeer\\ThreeDSPay\\Tests\\": "tests/"
+    }
+  },
+  "require-dev": {
+    "phpunit/phpunit": "^9.6|^10.0|^11.0",
+    "pestphp/pest": "^2.0|^3.0"
+  },
+  "minimum-stability": "stable",
+  "prefer-stable": true
+}
