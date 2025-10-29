@@ -44,19 +44,19 @@ composer require iabdulqadeer/laravel-3ds-pay
 #### Publish config
 
 ```bash
-php artisan vendor:publish --provider="Abdul\ThreeDSPay\ThreeDSPayServiceProvider" --tag=three-ds-config
+php artisan vendor:publish --provider="Iabdulqadeer\ThreeDSPay\Providers\ThreeDSPayServiceProvider" --tag=threeds-config --force
 ```
 
 #### Publish views
 
 ```bash
-php artisan vendor:publish --provider="Abdul\ThreeDSPay\ThreeDSPayServiceProvider" --tag=three-ds-views
+php artisan vendor:publish --provider="Iabdulqadeer\ThreeDSPay\Providers\ThreeDSPayServiceProvider" --tag=threeds-views --force
 ```
 
 #### Publish migrations (if any)
 
 ```bash
-php artisan vendor:publish --provider="Abdul\ThreeDSPay\ThreeDSPayServiceProvider" --tag=three-ds-migrations
+php artisan vendor:publish --provider="Iabdulqadeer\ThreeDSPay\Providers\ThreeDSPayServiceProvider" --tag=three-ds-migrations --force
 ```
 
 ```bash
@@ -68,46 +68,80 @@ php artisan migrate
 #### Add your Stripe keys in .env:
 
 ```bash
-STRIPE_KEY=pk_test_xxx
-STRIPE_SECRET=sk_test_xxx
-STRIPE_WEBHOOK_SECRET=whsec_xxx
+# -----------------------------
+# Stripe API Credentials
+# -----------------------------
+STRIPE_PUBLIC=
+STRIPE_SECRET=
+
+# Optional (for verifying incoming webhooks)
+STRIPE_WEBHOOK_SECRET=whsec_XXXXXXXXXXXXXXXXXXXXXXXX
+
+# -----------------------------
+# 3DS Package Settings
+# -----------------------------
+THREEDS_ROUTE_PREFIX=payments
+
+# Default demo amount and currency for the package checkout page
+THREEDS_DEMO_AMOUNT=9.99
+THREEDS_DEMO_CURRENCY=usd
+
+# Redirect URLs after success/cancel
+THREEDS_SUCCESS_URL=/payments/success
+THREEDS_CANCEL_URL=/payments/cancel
 ```
 
 ## ⚙️ Configuration File
 
 #### Once published, open:
-config/three_ds_pay.php
+config/three-ds-pay.php
 
 ```bash
 return [
-    'default' => env('THREEDS_DRIVER', 'stripe'),
+    /*
+    |--------------------------------------------------------------------------
+    | Route Prefix
+    |--------------------------------------------------------------------------
+    | All package routes will be prefixed with this value.
+    | Example: /payments/checkout, /payments/webhook
+    */
+    'route_prefix' => env('THREEDS_ROUTE_PREFIX', 'payments'),
 
-    'routes' => [
-        'prefix'     => env('THREEDS_PREFIX', 'pay'),
-        'middleware' => ['web'],
+    /*
+    |--------------------------------------------------------------------------
+    | Stripe API Keys
+    |--------------------------------------------------------------------------
+    | Set via .env. Public key is used client-side in the checkout view.
+    */
+    'stripe' => [
+        'public' => env('STRIPE_PUBLIC', ''),
+        'secret' => env('STRIPE_SECRET', ''),
     ],
 
-    'webhooks' => [
-        'queue' => env('THREEDS_WEBHOOK_QUEUE', 'default'),
+    /*
+    |--------------------------------------------------------------------------
+    | Demo Amount & Currency
+    |--------------------------------------------------------------------------
+    | Fixed checkout amount/currency for the demo page.
+    | Amount is in decimal units (e.g., 9.99 USD).
+    */
+    'demo' => [
+        'amount'   => (float) env('THREEDS_DEMO_AMOUNT', 9.99),
+        'currency' => env('THREEDS_DEMO_CURRENCY', 'usd'),
     ],
 
-    'defaults' => [
-        'amount'   => env('THREEDS_AMOUNT', '49.00'),
-        'currency' => env('THREEDS_CURRENCY', 'USD,EUR,GBP,INR'),
-        'order_id' => env('THREEDS_ORDER_ID', 'INV-1001'),
-    ],
-
-    'drivers' => [
-        'stripe' => [
-            'secret'         => env('STRIPE_SECRET'),
-            'publishable'    => env('STRIPE_KEY'),
-            'webhook_secret' => env('STRIPE_WEBHOOK_SECRET'),
-        ],
-        'flutterwave' => [
-            'secret' => env('FLW_SECRET'),
-        ],
+    /*
+    |--------------------------------------------------------------------------
+    | Redirects
+    |--------------------------------------------------------------------------
+    | Where to send users after payment success / cancel/failure.
+    */
+    'redirects' => [
+        'success' => env('THREEDS_SUCCESS_URL', '/payments/success'),
+        'cancel'  => env('THREEDS_CANCEL_URL', '/payments/cancel'),
     ],
 ];
+
 ```
 
 💡 Tips
@@ -125,11 +159,11 @@ Auto-registered (prefix = /pay):
 
 | Method | URI             | Description               |
 | ------ | --------------- | ------------------------- |
-| `GET`  | `/pay/checkout` | Checkout page             |
-| `POST` | `/pay/intent`   | Create payment intent     |
-| `GET`  | `/pay/return`   | Stripe 3DS return handler |
-| `GET`  | `/pay/result`   | Result page               |
-| `POST` | `/pay/webhook`  | Stripe webhook listener   |
+| `GET`  | `/payments/checkout` | Checkout page             |
+| `POST` | `/payments/intent`   | Create payment intent     |
+| `GET`  | `/payments/success`  | Stripe 3DS return handler |
+| `GET`  | `/payments/error`    | Result page               |
+| `POST` | `/payments/webhook`  | Stripe webhook listener   |
 
 
 ## 💳 Quick Start (Out of the Box)
@@ -142,7 +176,7 @@ Your checkout page is ready instantly.
 To customize it:
 
 ```bash
-php artisan vendor:publish --tag=three-ds-views
+php artisan vendor:publish --provider="Iabdulqadeer\ThreeDSPay\Providers\ThreeDSPayServiceProvider" --tag=threeds-views --force
 ```
 
 This publishes to:
@@ -150,39 +184,17 @@ This publishes to:
 resources/views/vendor/three-ds/
 
 ##  🧱 Example Blade Usage
-{{-- resources/views/vendor/three-ds/pages/checkout.blade.php --}}
+{{-- resources/views/vendor/threeds/checkout.blade.php --}}
+{{-- resources/views/vendor/threeds/success.blade.php --}}
+{{-- resources/views/vendor/threeds/error.blade.php --}}
 
-```bash
-@php
-  $title   = 'Secure Checkout';
-  $heading = 'Complete Payment';
-  $amount  = config('three_ds_pay.defaults.amount');
-  $curr    = config('three_ds_pay.defaults.currency');
-  $order   = config('three_ds_pay.defaults.order_id');
-@endphp
 
-<x-three-ds::layout :title="$title" :heading="$heading" :order_id="$order">
-  <div class="mx-auto max-w-xl">
-    <form id="three-ds-form" class="space-y-5 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white/95 dark:bg-slate-900/70 p-5 shadow-sm">
-      <x-three-ds::card-form
-        :amount_decimal="$amount"
-        :allowed_currencies="$curr"
-        :currency_default="$curr"
-        :order_id="$order"
-        :intent_route="route('three-ds.intent')"
-        :return_route="route('three-ds.return')"
-        :result_route="route('three-ds.result')"
-        :publishable="config('three_ds_pay.drivers.stripe.publishable')" />
-    </form>
-  </div>
-</x-three-ds::layout>
-```
 🌗 The built-in layout includes a Dark/Light mode toggle with persistence.
 
 
 ##  🧾 3DS Return + Invoices
 
-After 3D Secure authentication, Stripe redirects to /pay/return.
+After 3D Secure authentication, Stripe redirects to /payments/success.
 The package processes and redirects to /pay/result showing:
 
 ✅ Payment status
@@ -197,7 +209,7 @@ The package processes and redirects to /pay/result showing:
 
 Tell Stripe to send webhooks to:
 ```bash
-POST https://your-app.test/pay/webhook
+POST https://your-app.test/payments/webhook
 ```
 Set your signing secret:
 ```bash
@@ -205,21 +217,30 @@ STRIPE_WEBHOOK_SECRET=whsec_xxx
 ```
 Test locally using:
 ```bash
-stripe listen --forward-to http://localhost/pay/webhook
+stripe listen --forward-to http://localhost/payments/webhook
 ```
 ## 🧭 Example Custom Route
 
     // routes/web.php
     use Illuminate\Support\Facades\Route;
+    use Iabdulqadeer\ThreeDSPay\Http\Controllers\CheckoutController;
+    use Iabdulqadeer\ThreeDSPay\Http\Controllers\PaymentController;
+    use Iabdulqadeer\ThreeDSPay\Http\Controllers\WebhookController;
+    use Iabdulqadeer\ThreeDSPay\Http\Controllers\ResultController;
     
-    Route::get('/checkout', function () {
-        return view('three-ds::pages.checkout', [
-            'order_id' => config('three_ds_pay.defaults.order_id'),
-            // Optional overrides:
-            // 'amount_decimal' => '99.95',
-            // 'currency_default' => 'EUR',
-        ]);
-    })->name('three-ds.checkout');
+    Route::middleware(['web'])
+    ->prefix(config('three-ds-pay.route_prefix'))
+    ->name('threeds.')
+    ->group(function () {
+        Route::get('/checkout', [CheckoutController::class, 'show'])->name('checkout');
+        Route::post('/intent',   [PaymentController::class, 'createIntent'])->name('intent');
+
+        // Success now goes through a controller that resolves invoice links
+        Route::get('/success', [ResultController::class, 'success'])->name('success');
+
+        Route::view('/error', 'threeds::error')->name('error');
+        Route::post('/webhook', [WebhookController::class, 'handle'])->name('webhook');
+    });
 
 ## 🔒 Security
 
@@ -273,28 +294,45 @@ Ensure your composer.json looks like this:
 
 {
   "name": "iabdulqadeer/laravel-3ds-pay",
-  "description": "Pluggable 3D Secure payments for Laravel (Stripe driver included).",
+  "description": "Stripe 3DS (SCA) one-time payments for Laravel apps.",
   "type": "library",
-  "version": "0.1.0",
   "license": "MIT",
-  "autoload": {
-    "psr-4": {
-      "Abdul\\ThreeDSPay\\": "src/"
-    }
+  "version": "0.1.0",
+  "keywords": ["laravel", "stripe", "3ds", "sca", "payments"],
+  "support": {
+    "issues": "https://github.com/iabdulqadeer/laravel-3ds-pay/issues",
+    "source": "https://github.com/iabdulqadeer/laravel-3ds-pay"
   },
   "require": {
-    "php": ">=8.1",
-    "illuminate/support": "^10.0|^11.0|^12.0",
-    "stripe/stripe-php": "^15.0"
+    "php": ">=8.0",
+    "illuminate/support": "^9.0|^10.0|^11.0|^12.0",
+    "stripe/stripe-php": "^14.0"
+  },
+  "autoload": {
+    "psr-4": {
+      "Iabdulqadeer\\ThreeDSPay\\": "src/"
+    }
   },
   "extra": {
     "laravel": {
-      "providers": ["Abdul\\ThreeDSPay\\ThreeDSPayServiceProvider"],
-      "aliases": { "ThreeDS": "Abdul\\ThreeDSPay\\Facades\\ThreeDS" }
+      "providers": [
+        "Iabdulqadeer\\ThreeDSPay\\Providers\\ThreeDSPayServiceProvider"
+      ]
     }
   },
-  "minimum-stability": "stable"
+  "autoload-dev": {
+    "psr-4": {
+      "Iabdulqadeer\\ThreeDSPay\\Tests\\": "tests/"
+    }
+  },
+  "require-dev": {
+    "phpunit/phpunit": "^9.6|^10.0|^11.0",
+    "pestphp/pest": "^2.0|^3.0"
+  },
+  "minimum-stability": "stable",
+  "prefer-stable": true
 }
+
 ```
 
 🏷 Step 3 — Tag and Push Version
@@ -319,25 +357,36 @@ Packagist will automatically sync new tags.
 
 .env
 ```bash
-APP_URL=https://your-app.test
+# -----------------------------
+# Stripe API Credentials
+# -----------------------------
+STRIPE_PUBLIC=
+STRIPE_SECRET=
 
-STRIPE_KEY=pk_test_xxx
-STRIPE_SECRET=sk_test_xxx
-STRIPE_WEBHOOK_SECRET=whsec_xxx
+# Optional (for verifying incoming webhooks)
+STRIPE_WEBHOOK_SECRET=whsec_XXXXXXXXXXXXXXXXXXXXXXXX
 
-THREEDS_DRIVER=stripe
-THREEDS_PREFIX=pay
-THREEDS_AMOUNT=49.00
-THREEDS_CURRENCY=USD,EUR,GBP,INR
-THREEDS_ORDER_ID=INV-1001
+# -----------------------------
+# 3DS Package Settings
+# -----------------------------
+THREEDS_ROUTE_PREFIX=payments
+
+# Default demo amount and currency for the package checkout page
+THREEDS_DEMO_AMOUNT=9.99
+THREEDS_DEMO_CURRENCY=usd
+
+# Redirect URLs after success/cancel
+THREEDS_SUCCESS_URL=/payments/success
+THREEDS_CANCEL_URL=/payments/cancel
 ```
 
 routes/web.php
 
 ```bash
 use Illuminate\Support\Facades\Route;
+use Iabdulqadeer\ThreeDSPay\Http\Controllers\CheckoutController;
 
-Route::get('/checkout', fn () => view('three-ds::pages.checkout'))->name('three-ds.checkout');
+Route::get('/checkout', [CheckoutController::class, 'show'])->name('checkout');
 ```
 
 Run locally
@@ -346,7 +395,7 @@ Run locally
 php artisan serve
 ```
 
-# Visit http://localhost:8000/pay/checkout
+# Visit http://localhost:8000/payments/checkout
 
 
 Test Card (3DS)
